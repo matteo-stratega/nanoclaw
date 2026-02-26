@@ -33,8 +33,8 @@ ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 RUN curl -sL "https://github.com/steipete/gogcli/releases/download/v0.11.0/gogcli_0.11.0_linux_arm64.tar.gz" \
     | tar -xz -C /usr/local/bin/ gog && chmod +x /usr/local/bin/gog
 
-# Install mcporter (MCP CLI generator)
-RUN npm install -g mcporter
+# Install mcporter (MCP CLI generator) and n8n-mcp (n8n workflow management)
+RUN npm install -g mcporter n8n-mcp
 
 # Install agent-browser and claude-code globally
 RUN npm install -g agent-browser @anthropic-ai/claude-code

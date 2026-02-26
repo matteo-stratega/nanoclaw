@@ -390,7 +390,8 @@ async function runQuery(
         'TeamCreate', 'TeamDelete', 'SendMessage',
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
-        'mcp__nanoclaw__*'
+        'mcp__nanoclaw__*',
+        'mcp__n8n__*'
       ],
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
@@ -405,6 +406,17 @@ async function runQuery(
             NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
           },
         },
+        // Add n8n MCP server if N8N_API_URL is configured (e.g., for n8n-expert group)
+        ...(process.env.N8N_API_URL ? {
+          n8n: {
+            command: 'npx',
+            args: ['-y', 'n8n-mcp'],
+            env: {
+              N8N_API_URL: process.env.N8N_API_URL,
+              N8N_API_KEY: process.env.N8N_API_KEY || '',
+            },
+          },
+        } : {}),
       },
       hooks: {
         PreCompact: [{ hooks: [createPreCompactHook()] }]

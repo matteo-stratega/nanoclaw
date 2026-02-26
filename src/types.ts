@@ -30,6 +30,7 @@ export interface AllowedRoot {
 export interface ContainerConfig {
   additionalMounts?: AdditionalMount[];
   timeout?: number; // Default: 300000 (5 minutes)
+  extraEnv?: Record<string, string>; // Additional env vars passed to the container (e.g., N8N_API_URL)
 }
 
 export interface RegisteredGroup {

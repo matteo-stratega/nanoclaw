@@ -9,14 +9,36 @@ store/
 data/
 logs/
 
-# Groups - only track base structure and specific CLAUDE.md files
+# Groups - track CLAUDE.md files for all agent groups
 groups/*
 !groups/main/
 !groups/global/
+!groups/operativo/
+!groups/pm/
+!groups/content/
+!groups/researcher/
+!groups/n8n-expert/
+!groups/archivista/
 groups/main/*
 groups/global/*
+groups/operativo/*
+groups/pm/*
+groups/content/*
+groups/researcher/*
+groups/n8n-expert/*
+groups/archivista/*
 !groups/main/CLAUDE.md
 !groups/global/CLAUDE.md
+!groups/global/context.md
+!groups/operativo/CLAUDE.md
+!groups/pm/CLAUDE.md
+!groups/content/CLAUDE.md
+!groups/researcher/CLAUDE.md
+!groups/n8n-expert/CLAUDE.md
+!groups/archivista/CLAUDE.md
+
+# Generated tools (mcporter CLIs)
+tools/
 
 # Secrets
 *.keys.json

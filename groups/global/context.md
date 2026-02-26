@@ -35,15 +35,24 @@ Fondatore di Stratega, basato a Barcellona. 6 anni di esperienza B2B growth (202
 - Miglior mese di sempre per l'account
 
 *TrendJourney* (fashion AI, co-fondato con Fabio):
-- Sistema multi-agente (5 agenti specializzati)
-- 256 prospect maglifici mappati
-- CI completa: 7 competitor, white space confermato
-- Sito trilingue pronto al deploy
+- Sito trilingue LIVE (trendjourney.ai). Astro + Tailwind. GTM+GA4+Iubenda.
+- BCN: 24 account + 52 prospect su Crono, campagna "SPA - Founders Eng" attiva (25 Feb)
+- Batch 1: 17 funded (28 prospect). Batch 2: 13 pre-seed/seed. Batch 3: 24 team members
+- Dropcontact: ~31.797 crediti. Veronica Mancassola (ex Cavalli, BCN): follow-up 11 Mar
+- Next: Phase 3 (Fabio Deployment), 136 prospect target su Crono (52 done, 84 remaining)
 
 *Sales OS* (framework productized):
 - Flywheel 8 stage, 39 asset
-- MEDDIC su HubSpot: 8 proprieta' attive, pipeline scorata
-- 6 aziende con sistemi completi
+- MEDDIC su HubSpot: 10 deal scorati, pipeline attiva
+- Productization: Option C (framework free + implementation €500-2K)
+
+*Academy*:
+- Corso GTM Kit su Astro+Supabase. 9 moduli + 9 video YouTube + exercises interattivi
+- Phase 3 complete su localhost. Pending: i18n EN->IT, remove dev-login, Netlify deploy
+
+*CI Agent*:
+- 4 n8n workflows deployed (orchestrator+executor+verification+PDF server)
+- Chrome sidecar live. Pending: attivazione via n8n UI
 
 ### Competenze Chiave
 - *AI & Automazione*: Claude Code + MCP + memory graph + agent systems (top 0.1%)
@@ -69,33 +78,42 @@ Growth lab, product studio, research engine. Costruisce infrastruttura di cresci
 - *Positioning*: "Accessible Growth Executive" — builder + GTM, non sales consultant
 - *Sales OS*: Framework free via BIP + Academy. Implementation €500-2K
 
-### Revenue Attuale
+### Revenue Attuale (aggiornato 26 Feb 2026)
 - MRR: €849 (solo Duomo Design)
+- One-off Q1: €500 (Lorenzo, closed)
 - Target Q1 2026: €2,000+
 - Gap: -€825/mese
 - Runway: 13 mesi
 
-### Pipeline Attiva (Feb 2026)
+### Pipeline Attiva (26 Feb 2026)
 
-| Deal | Stage | Valore |
-|------|-------|--------|
-| Jubatus | Call 19 Feb | €750-1,250/mese |
-| Cora Hospitality | Meeting da fissare | €1,500-2,500/mese |
-| Lorenzo Rotteglia | Opzione A accettata | €500 one-shot |
-| Entreprelearners | Coffee pending | €500-697 |
+| Deal | Stage | Valore | Note |
+|------|-------|--------|------|
+| Cora Hospitality | Meeting da fissare | €1,500-2,500/mese | Aspetta loro contatto |
+| Entreprelearners | Coffee done 23 Feb | €500-697 | Follow-up James |
+| PandasAI | Call done 23 Feb | TBD | Aspetta follow-up |
+
+**Closed Lost**: Jubatus (23 Feb — scope mismatch, budget -50%, zero doc), Chatty (10 Feb), Dedo/TheCave (11 Feb)
+**Closed Won**: Lorenzo €500 one-shot (LoE firmata 18 Feb)
 
 ### Progetti
 
 | Progetto | Status |
 |----------|--------|
-| TrendJourney | 256 prospect, sito pronto, launch imminente |
-| Sales OS | Framework definito, 39 asset |
-| Academy | Format interattivo, piattaforma da scegliere |
-| LinkedIn BIP | W8, schedule Lun/Mer/Ven |
+| TrendJourney | Sito LIVE, 52/136 prospect su Crono, campagna BCN attiva |
+| Sales OS | Flywheel definita, productization Option C |
+| Academy | 9 moduli completi, pending i18n + deploy |
+| LinkedIn BIP | W9, schedule Lun/Mer/Ven. Partners: Gamma + Fathom |
+| CI Agent | 4 workflows deployed, pending activation |
 
 ### Clienti Attivi
-- *Duomo Design*: ADV ongoing, minimo effort. Check 28 Feb
-- *PJPF*: La Fee Maraboutee SS27 deliverables pronti
+- *Duomo Design*: ADV ongoing, €849/mese. Meta token renewal 17 Apr
+
+### Scadenze Critiche
+- **28 Feb**: ABM Phase 1 (IT TOP 10 import + n8n workflow debug)
+- **28 Feb**: TJ 136 prospect su Crono
+- **11 Mar**: Veronica Mancassola follow-up (TJ)
+- **17 Apr**: Duomo Meta token renewal
 
 ---
 

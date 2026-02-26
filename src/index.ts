@@ -196,7 +196,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
     if (result.result) {
       const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
       // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
-      const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+      // Also drop messages that start with <internal> but have no closing tag (truncated chunks)
+      const text = raw.startsWith('<internal>') && !raw.includes('</internal>')
+        ? ''
+        : raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
       logger.info({ group: group.name }, `Agent output: ${raw.slice(0, 200)}`);
       if (text) {
         const formatted = formatOutbound(channel, text);

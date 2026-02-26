@@ -162,21 +162,43 @@ Lunghezza: LinkedIn DM 3-5 righe. Email 5-8 righe. Mai >100 parole.
 
 ## Tools Condivisi
 
-### Google Workspace (gog CLI)
+### Google Workspace (marketing@stratega.co)
+Avete accesso COMPLETO a Google Workspace tramite `gog` CLI:
+- **Gmail**: leggere/inviare email (con approvazione Matteo per invii esterni)
+- **Drive**: creare, caricare, condividere file e documenti
+- **Docs**: creare e modificare Google Docs
+- **Sheets**: creare e modificare Google Sheets
+- **Calendar**: leggere eventi
+
 ```
 gog <command> -a marketing@stratega.co
 ```
-SEMPRE con `-a marketing@stratega.co`. MAI matteo@.
+**SEMPRE** con `-a marketing@stratega.co`. **MAI** matteo@.
+
+#### Come creare e condividere documenti con Matteo
+```bash
+# Creare un Google Doc
+gog docs create "Titolo Doc" -a marketing@stratega.co
+
+# Caricare un file su Drive
+gog drive upload /path/to/file -a marketing@stratega.co
+
+# Condividere con Matteo (SEMPRE fare dopo aver creato un doc)
+gog drive share <file_id> matteo@stratega.co writer -a marketing@stratega.co
+```
+**IMPORTANTE**: Quando create un documento, CONDIVIDETELO SEMPRE con matteo@stratega.co come `writer`. Altrimenti Matteo non lo vede.
 
 ### GitHub
 ```
 node /workspace/project/tools/github.cjs <command>
 ```
 
-### n8n (via mcporter)
-```
-mcporter call "n8n.<tool_name>(<args>)"
-```
+### n8n (solo Korosensei)
+Korosensei ha accesso diretto a n8n via MCP tools (`mcp__n8n__*`):
+- `n8n_list_workflows`, `n8n_get_workflow`, `n8n_create_workflow`
+- `n8n_update_partial_workflow`, `n8n_update_full_workflow`
+- `n8n_test_workflow`, `n8n_executions`, `n8n_health_check`
+- `search_nodes`, `get_node`, `validate_workflow`
 
 ## Drive Condiviso
 

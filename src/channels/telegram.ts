@@ -1,3 +1,7 @@
+import fs from "fs";
+import os from "os";
+import path from "path";
+
 import { Bot } from "grammy";
 
 import {
@@ -241,7 +245,54 @@ export class TelegramChannel implements Channel {
       });
     };
 
-    bot.on("message:photo", (ctx) => storeNonText(ctx, "[Photo]"));
+    bot.on("message:photo", async (ctx) => {
+      const chatJid = `tg:${ctx.chat.id}`;
+      const group = this.opts.registeredGroups()[chatJid];
+      if (!group) return;
+
+      try {
+        const tokenForDownload = this.getTokenForJid(chatJid);
+        // Get largest photo size
+        const photos = ctx.message.photo;
+        const largest = photos[photos.length - 1];
+        const file = await ctx.api.getFile(largest.file_id);
+        const url = `https://api.telegram.org/file/bot${tokenForDownload}/${file.file_path}`;
+        const res = await fetch(url);
+        const buffer = Buffer.from(await res.arrayBuffer());
+
+        // Save to workspace photos dir
+        const photosDir = path.join(os.homedir(), ".local/share/nanoclaw/photos");
+        fs.mkdirSync(photosDir, { recursive: true });
+        const filename = `photo-${Date.now()}.jpg`;
+        const filepath = path.join(photosDir, filename);
+        fs.writeFileSync(filepath, buffer);
+
+        const caption = ctx.message.caption ? ` ${ctx.message.caption}` : "";
+        const timestamp = new Date(ctx.message.date * 1000).toISOString();
+        const senderName = ctx.from?.first_name || ctx.from?.username || "Unknown";
+        this.opts.onChatMetadata(chatJid, timestamp);
+
+        let content = `[Photo: ${filepath}]${caption}`;
+        if (isStaffBot && !TRIGGER_PATTERN.test(content)) {
+          content = `@${ASSISTANT_NAME} ${content}`;
+        }
+
+        this.opts.onMessage(chatJid, {
+          id: ctx.message.message_id.toString(),
+          chat_jid: chatJid,
+          sender: ctx.from?.id?.toString() || "",
+          sender_name: senderName,
+          content,
+          timestamp,
+          is_from_me: false,
+        });
+        logger.info({ chatJid, filepath }, "Photo saved");
+        return;
+      } catch (err) {
+        logger.error({ err }, "Photo download failed, falling back to placeholder");
+      }
+      storeNonText(ctx, "[Photo]");
+    });
     bot.on("message:video", (ctx) => storeNonText(ctx, "[Video]"));
     bot.on("message:voice", async (ctx) => {
       const chatJid = `tg:${ctx.chat.id}`;

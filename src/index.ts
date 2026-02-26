@@ -6,8 +6,10 @@ import path from 'path';
 import {
   ASSISTANT_NAME,
   DATA_DIR,
+  DEFAULT_MODEL,
   IDLE_TIMEOUT,
   MAIN_GROUP_FOLDER,
+  MAIN_MODEL,
   POLL_INTERVAL,
   TRIGGER_PATTERN,
   TELEGRAM_BOT_TOKEN,
@@ -82,6 +84,9 @@ function saveState(): void {
   );
 }
 
+// Reference to Telegram channel for staff bot management (set during main())
+let telegramRef: TelegramChannel | null = null;
+
 function registerGroup(jid: string, group: RegisteredGroup): void {
   registeredGroups[jid] = group;
   setRegisteredGroup(jid, group);
@@ -90,8 +95,15 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
   const groupDir = path.join(DATA_DIR, '..', 'groups', group.folder);
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
 
+  // Start staff bot if this group has a dedicated bot token
+  if (group.botToken && telegramRef) {
+    telegramRef.startStaffBot(jid, group.botToken, group.name).catch((err) => {
+      logger.error({ jid, name: group.name, err }, 'Failed to start staff bot on registration');
+    });
+  }
+
   logger.info(
-    { jid, name: group.name, folder: group.folder },
+    { jid, name: group.name, folder: group.folder, hasStaffBot: !!group.botToken },
     'Group registered',
   );
 }
@@ -265,6 +277,9 @@ async function runAgent(
       }
     : undefined;
 
+  // Resolve model: group override > main default > global default
+  const model = group.model || (isMain ? MAIN_MODEL : DEFAULT_MODEL);
+
   try {
     const output = await runContainerAgent(
       group,
@@ -274,6 +289,7 @@ async function runAgent(
         groupFolder: group.folder,
         chatJid,
         isMain,
+        model,
       },
       (proc, containerName) => queue.registerProcess(chatJid, proc, containerName, group.folder),
       wrappedOnOutput,
@@ -495,10 +511,25 @@ async function main(): Promise<void> {
     await whatsapp.connect();
   }
 
+  let telegramChannel: TelegramChannel | null = null;
   if (TELEGRAM_BOT_TOKEN) {
-    const telegram = new TelegramChannel(TELEGRAM_BOT_TOKEN, channelOpts);
-    channels.push(telegram);
-    await telegram.connect();
+    telegramChannel = new TelegramChannel(TELEGRAM_BOT_TOKEN, channelOpts);
+    channels.push(telegramChannel);
+    await telegramChannel.connect();
+
+    // Store reference for dynamic staff bot creation on group registration
+    telegramRef = telegramChannel;
+
+    // Start staff bots for registered groups with dedicated bot tokens
+    for (const [jid, group] of Object.entries(registeredGroups)) {
+      if (group.botToken) {
+        try {
+          await telegramChannel.startStaffBot(jid, group.botToken, group.name);
+        } catch (err) {
+          logger.error({ jid, name: group.name, err }, 'Failed to start staff bot');
+        }
+      }
+    }
   }
 
   // Start subsystems (independently of connection handler)

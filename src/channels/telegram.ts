@@ -5,12 +5,19 @@ import {
   TRIGGER_PATTERN,
 } from "../config.js";
 import { logger } from "../logger.js";
+import { transcribeAudio } from "../transcribe.js";
 import { Channel, OnInboundMessage, OnChatMetadata, RegisteredGroup, NewMessage } from "../types.js";
 
 export interface TelegramChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
   registeredGroups: () => Record<string, RegisteredGroup>;
+}
+
+interface StaffBot {
+  bot: Bot;
+  jid: string; // The chat JID this bot serves
+  name: string; // Display name (e.g., "Dwight")
 }
 
 export class TelegramChannel implements Channel {
@@ -20,6 +27,7 @@ export class TelegramChannel implements Channel {
   private bot: Bot | null = null;
   private opts: TelegramChannelOpts;
   private botToken: string;
+  private staffBots: Map<string, StaffBot> = new Map(); // JID → StaffBot
 
   constructor(botToken: string, opts: TelegramChannelOpts) {
     this.botToken = botToken;
@@ -28,9 +36,90 @@ export class TelegramChannel implements Channel {
 
   async connect(): Promise<void> {
     this.bot = new Bot(this.botToken);
+    this.setupBotHandlers(this.bot, false);
 
+    // Start polling
+    return new Promise<void>((resolve) => {
+      this.bot!.start({
+        onStart: (botInfo) => {
+          logger.info(
+            { username: botInfo.username, id: botInfo.id },
+            "Telegram bot connected",
+          );
+          console.log(`\n  Telegram bot: @${botInfo.username}`);
+          console.log(
+            `  Send /chatid to the bot to get a chat's registration ID\n`,
+          );
+          resolve();
+        },
+      });
+    });
+  }
+
+  /**
+   * Start a dedicated staff bot for a registered group.
+   * The staff bot only handles messages from its assigned chat JID.
+   */
+  async startStaffBot(jid: string, token: string, name: string): Promise<void> {
+    // Don't start duplicates
+    if (this.staffBots.has(jid)) {
+      logger.debug({ jid, name }, "Staff bot already running");
+      return;
+    }
+
+    const bot = new Bot(token);
+    this.setupBotHandlers(bot, true);
+
+    const staffBot: StaffBot = { bot, jid, name };
+
+    return new Promise<void>((resolve, reject) => {
+      bot.start({
+        onStart: (botInfo) => {
+          this.staffBots.set(jid, staffBot);
+          logger.info(
+            { username: botInfo.username, id: botInfo.id, jid, name },
+            "Staff bot connected",
+          );
+          console.log(`  Staff bot: @${botInfo.username} → ${name} (${jid})`);
+          resolve();
+        },
+      });
+
+      // Timeout after 15s
+      setTimeout(() => {
+        if (!this.staffBots.has(jid)) {
+          reject(new Error(`Staff bot ${name} failed to start within 15s`));
+        }
+      }, 15000);
+    });
+  }
+
+  /**
+   * Stop a staff bot.
+   */
+  async stopStaffBot(jid: string): Promise<void> {
+    const staffBot = this.staffBots.get(jid);
+    if (staffBot) {
+      staffBot.bot.stop();
+      this.staffBots.delete(jid);
+      logger.info({ jid, name: staffBot.name }, "Staff bot stopped");
+    }
+  }
+
+  /**
+   * Get all active staff bot JIDs.
+   */
+  getActiveStaffBotJids(): string[] {
+    return Array.from(this.staffBots.keys());
+  }
+
+  /**
+   * Set up message handlers on a bot instance.
+   * Used for both the main bot and staff bots.
+   */
+  private setupBotHandlers(bot: Bot, isStaffBot: boolean): void {
     // Command to get chat ID (useful for registration)
-    this.bot.command("chatid", (ctx) => {
+    bot.command("chatid", (ctx) => {
       const chatId = ctx.chat.id;
       const chatType = ctx.chat.type;
       const chatName =
@@ -45,11 +134,12 @@ export class TelegramChannel implements Channel {
     });
 
     // Command to check bot status
-    this.bot.command("ping", (ctx) => {
-      ctx.reply(`${ASSISTANT_NAME} is online.`);
+    bot.command("ping", (ctx) => {
+      const botName = isStaffBot ? "Staff agent" : ASSISTANT_NAME;
+      ctx.reply(`${botName} is online.`);
     });
 
-    this.bot.on("message:text", async (ctx) => {
+    bot.on("message:text", async (ctx) => {
       // Skip commands
       if (ctx.message.text.startsWith("/")) return;
 
@@ -101,6 +191,16 @@ export class TelegramChannel implements Channel {
         return;
       }
 
+      // For staff bots: treat all messages as no-trigger (private chats, always respond)
+      // The trigger check happens in processGroupMessages anyway
+      if (isStaffBot) {
+        // Staff bots always respond — override trigger requirement
+        // We inject a synthetic trigger if the content doesn't already have one
+        if (!TRIGGER_PATTERN.test(content)) {
+          content = `@${ASSISTANT_NAME} ${content}`;
+        }
+      }
+
       // Deliver message — startMessageLoop() will pick it up
       this.opts.onMessage(chatJid, {
         id: msgId,
@@ -113,7 +213,7 @@ export class TelegramChannel implements Channel {
       });
 
       logger.info(
-        { chatJid, chatName, sender: senderName },
+        { chatJid, chatName, sender: senderName, isStaffBot },
         "Telegram message stored",
       );
     });
@@ -141,47 +241,100 @@ export class TelegramChannel implements Channel {
       });
     };
 
-    this.bot.on("message:photo", (ctx) => storeNonText(ctx, "[Photo]"));
-    this.bot.on("message:video", (ctx) => storeNonText(ctx, "[Video]"));
-    this.bot.on("message:voice", (ctx) => storeNonText(ctx, "[Voice message]"));
-    this.bot.on("message:audio", (ctx) => storeNonText(ctx, "[Audio]"));
-    this.bot.on("message:document", (ctx) => {
+    bot.on("message:photo", (ctx) => storeNonText(ctx, "[Photo]"));
+    bot.on("message:video", (ctx) => storeNonText(ctx, "[Video]"));
+    bot.on("message:voice", async (ctx) => {
+      const chatJid = `tg:${ctx.chat.id}`;
+      const group = this.opts.registeredGroups()[chatJid];
+      if (!group) return;
+
+      // Use the correct bot token for voice file download
+      const tokenForDownload = this.getTokenForJid(chatJid);
+
+      try {
+        const file = await ctx.getFile();
+        const url = `https://api.telegram.org/file/bot${tokenForDownload}/${file.file_path}`;
+        const res = await fetch(url);
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const text = await transcribeAudio(buffer);
+        if (text) {
+          const timestamp = new Date(ctx.message.date * 1000).toISOString();
+          const senderName = ctx.from?.first_name || ctx.from?.username || "Unknown";
+          this.opts.onChatMetadata(chatJid, timestamp);
+
+          let content = `[Voice] ${text}`;
+          // Staff bots: inject trigger for voice messages too
+          if (isStaffBot && !TRIGGER_PATTERN.test(content)) {
+            content = `@${ASSISTANT_NAME} ${content}`;
+          }
+
+          this.opts.onMessage(chatJid, {
+            id: ctx.message.message_id.toString(),
+            chat_jid: chatJid,
+            sender: ctx.from?.id?.toString() || "",
+            sender_name: senderName,
+            content,
+            timestamp,
+            is_from_me: false,
+          });
+          logger.info({ chatJid, chars: text.length }, "Voice message transcribed");
+          return;
+        }
+      } catch (err) {
+        logger.error({ err }, "Voice transcription failed, falling back to placeholder");
+      }
+      storeNonText(ctx, "[Voice message]");
+    });
+    bot.on("message:audio", (ctx) => storeNonText(ctx, "[Audio]"));
+    bot.on("message:document", (ctx) => {
       const name = ctx.message.document?.file_name || "file";
       storeNonText(ctx, `[Document: ${name}]`);
     });
-    this.bot.on("message:sticker", (ctx) => {
+    bot.on("message:sticker", (ctx) => {
       const emoji = ctx.message.sticker?.emoji || "";
       storeNonText(ctx, `[Sticker ${emoji}]`);
     });
-    this.bot.on("message:location", (ctx) => storeNonText(ctx, "[Location]"));
-    this.bot.on("message:contact", (ctx) => storeNonText(ctx, "[Contact]"));
+    bot.on("message:location", (ctx) => storeNonText(ctx, "[Location]"));
+    bot.on("message:contact", (ctx) => storeNonText(ctx, "[Contact]"));
 
     // Handle errors gracefully
-    this.bot.catch((err) => {
-      logger.error({ err: err.message }, "Telegram bot error");
-    });
-
-    // Start polling
-    return new Promise<void>((resolve) => {
-      this.bot!.start({
-        onStart: (botInfo) => {
-          logger.info(
-            { username: botInfo.username, id: botInfo.id },
-            "Telegram bot connected",
-          );
-          console.log(`\n  Telegram bot: @${botInfo.username}`);
-          console.log(
-            `  Send /chatid to the bot to get a chat's registration ID\n`,
-          );
-          resolve();
-        },
-      });
+    bot.catch((err) => {
+      logger.error({ err: err.message, isStaffBot }, "Telegram bot error");
     });
   }
 
+  /**
+   * Get the bot token for a given JID.
+   * Staff bots use their own token, everything else uses the main bot token.
+   */
+  private getTokenForJid(jid: string): string {
+    const staffBot = this.staffBots.get(jid);
+    return staffBot ? this.getStaffBotToken(jid) : this.botToken;
+  }
+
+  /**
+   * Get a staff bot's token from the Bot instance.
+   * Grammy stores the token internally — we retrieve it from registered groups.
+   */
+  private getStaffBotToken(jid: string): string {
+    const group = this.opts.registeredGroups()[jid];
+    return group?.botToken || this.botToken;
+  }
+
+  /**
+   * Get the correct Bot API instance for a JID.
+   * Routes through staff bot if one exists, otherwise uses main bot.
+   */
+  private getBotForJid(jid: string): Bot | null {
+    const staffBot = this.staffBots.get(jid);
+    if (staffBot) return staffBot.bot;
+    return this.bot;
+  }
+
   async sendMessage(jid: string, text: string): Promise<void> {
-    if (!this.bot) {
-      logger.warn("Telegram bot not initialized");
+    const bot = this.getBotForJid(jid);
+    if (!bot) {
+      logger.warn({ jid }, "No bot available for JID");
       return;
     }
 
@@ -191,13 +344,15 @@ export class TelegramChannel implements Channel {
       // Telegram has a 4096 character limit per message
       const MAX_LENGTH = 4096;
       if (text.length <= MAX_LENGTH) {
-        await this.bot.api.sendMessage(numericId, text);
+        await bot.api.sendMessage(numericId, text);
       } else {
         for (let i = 0; i < text.length; i += MAX_LENGTH) {
-          await this.bot.api.sendMessage(numericId, text.slice(i, i + MAX_LENGTH));
+          await bot.api.sendMessage(numericId, text.slice(i, i + MAX_LENGTH));
         }
       }
-      logger.info({ jid, length: text.length }, "Telegram message sent");
+
+      const isStaff = this.staffBots.has(jid);
+      logger.info({ jid, length: text.length, isStaff }, "Telegram message sent");
     } catch (err) {
       logger.error({ jid, err }, "Failed to send Telegram message");
     }
@@ -212,6 +367,14 @@ export class TelegramChannel implements Channel {
   }
 
   async disconnect(): Promise<void> {
+    // Stop all staff bots first
+    for (const [jid, staffBot] of this.staffBots) {
+      staffBot.bot.stop();
+      logger.info({ jid, name: staffBot.name }, "Staff bot stopped");
+    }
+    this.staffBots.clear();
+
+    // Stop main bot
     if (this.bot) {
       this.bot.stop();
       this.bot = null;
@@ -220,10 +383,12 @@ export class TelegramChannel implements Channel {
   }
 
   async setTyping(jid: string, isTyping: boolean): Promise<void> {
-    if (!this.bot || !isTyping) return;
+    if (!isTyping) return;
+    const bot = this.getBotForJid(jid);
+    if (!bot) return;
     try {
       const numericId = jid.replace(/^tg:/, "");
-      await this.bot.api.sendChatAction(numericId, "typing");
+      await bot.api.sendChatAction(numericId, "typing");
     } catch (err) {
       logger.debug({ jid, err }, "Failed to send Telegram typing indicator");
     }

@@ -240,36 +240,54 @@ server.tool(
 
 server.tool(
   'register_group',
-  `Register a new WhatsApp group so the agent can respond to messages there. Main group only.
+  `Registra un nuovo gruppo Telegram come agente indipendente. Solo il gruppo main puo' farlo.
 
-Use available_groups.json to find the JID for a group. The folder name should be lowercase with hyphens (e.g., "family-chat").`,
+Usa /chatid nel gruppo Telegram per ottenere il JID. Il folder name deve essere lowercase con trattini (es. "operativo", "n8n-expert").
+
+Puoi opzionalmente specificare additional_mounts per dare all'agente accesso a directory specifiche dell'host (validate contro l'allowlist di sicurezza).`,
   {
-    jid: z.string().describe('The WhatsApp JID (e.g., "120363336345536173@g.us")'),
-    name: z.string().describe('Display name for the group'),
-    folder: z.string().describe('Folder name for group files (lowercase, hyphens, e.g., "family-chat")'),
-    trigger: z.string().describe('Trigger word (e.g., "@Andy")'),
+    jid: z.string().describe('Il JID Telegram (es. "tg:123456789")'),
+    name: z.string().describe('Nome display del gruppo'),
+    folder: z.string().describe('Nome cartella per i file del gruppo (lowercase, trattini, es. "operativo")'),
+    trigger: z.string().describe('Trigger word (es. "@Operativo")'),
+    model: z.string().optional().describe('Modello Claude da usare (es. "sonnet", "opus"). Default: "sonnet"'),
+    bot_token: z.string().optional().describe('Token Telegram dedicato per questo agente (da BotFather). Se specificato, l\'agente usa il proprio bot invece di quello principale.'),
+    additional_mounts: z.array(z.object({
+      hostPath: z.string().describe('Percorso assoluto sull\'host (supporta ~ per home)'),
+      containerPath: z.string().optional().describe('Percorso nel container (default: basename del hostPath)'),
+      readonly: z.boolean().optional().describe('Read-only? Default: true'),
+    })).optional().describe('Mount aggiuntivi per dare accesso a directory specifiche'),
   },
   async (args) => {
     if (!isMain) {
       return {
-        content: [{ type: 'text' as const, text: 'Only the main group can register new groups.' }],
+        content: [{ type: 'text' as const, text: 'Solo il gruppo main puo\' registrare nuovi gruppi.' }],
         isError: true,
       };
     }
 
-    const data = {
+    const data: Record<string, unknown> = {
       type: 'register_group',
       jid: args.jid,
       name: args.name,
       folder: args.folder,
       trigger: args.trigger,
+      botToken: args.bot_token || undefined,
+      model: args.model || undefined,
       timestamp: new Date().toISOString(),
     };
 
+    if (args.model || args.additional_mounts) {
+      data.containerConfig = {
+        ...(args.additional_mounts ? { additionalMounts: args.additional_mounts } : {}),
+      };
+    }
+
     writeIpcFile(TASKS_DIR, data);
 
+    const botInfo = args.bot_token ? ' con bot dedicato' : '';
     return {
-      content: [{ type: 'text' as const, text: `Group "${args.name}" registered. It will start receiving messages immediately.` }],
+      content: [{ type: 'text' as const, text: `Gruppo "${args.name}" registrato (folder: ${args.folder})${botInfo}. Iniziera' a ricevere messaggi subito.` }],
     };
   },
 );

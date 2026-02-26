@@ -26,6 +26,7 @@ interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  model?: string; // Claude model to use (e.g., 'opus', 'sonnet')
 }
 
 interface ContainerOutput {
@@ -374,6 +375,7 @@ async function runQuery(
   for await (const message of query({
     prompt: stream,
     options: {
+      model: containerInput.model,
       cwd: '/workspace/group',
       resume: sessionId,
       resumeSessionAt: resumeAt,

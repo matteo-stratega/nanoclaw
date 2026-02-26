@@ -39,6 +39,8 @@ export interface RegisteredGroup {
   added_at: string;
   containerConfig?: ContainerConfig;
   requiresTrigger?: boolean; // Default: true for groups, false for solo chats
+  model?: string; // Claude model to use (e.g., 'opus', 'sonnet'). Default: 'sonnet'
+  botToken?: string; // Dedicated Telegram bot token for this group (staff agents)
 }
 
 export interface NewMessage {

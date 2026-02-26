@@ -40,6 +40,7 @@ export interface ContainerInput {
   chatJid: string;
   isMain: boolean;
   isScheduledTask?: boolean;
+  model?: string; // Claude model to use (e.g., 'opus', 'sonnet')
 }
 
 export interface ContainerOutput {
@@ -192,6 +193,17 @@ function buildVolumeMounts(
     containerPath: '/app/src',
     readonly: true,
   });
+
+  // Mount gog credentials for Google Workspace access (marketing@ only)
+  // Security: only marketing@stratega.co token is in this directory, never matteo@
+  const gogCredsDir = path.join(DATA_DIR, 'gog-credentials');
+  if (fs.existsSync(gogCredsDir)) {
+    mounts.push({
+      hostPath: gogCredsDir,
+      containerPath: '/home/node/.config/gogcli',
+      readonly: true,
+    });
+  }
 
   // Additional mounts validated against external allowlist (tamper-proof from containers)
   if (group.containerConfig?.additionalMounts) {
